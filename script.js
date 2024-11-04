@@ -11,7 +11,6 @@ const sizePicker = document.querySelector('input[type="range"]');
 const output = document.querySelector('.output');
 const clearBtn = document.getElementById('clearButton');
 const startBtn = document.getElementById('startButton');
-const ballCount = document.querySelector('.ballCount');
 
 // covert degrees to radians
 function degToRad(degrees) {
@@ -26,20 +25,41 @@ sizePicker.addEventListener('input', () => output.textContent = sizePicker.value
 let curX;
 let curY;
 let balls = [];
+let flowIntervalId;
 let interval;
-let shift = 130;
+let shift = 100;
 const rect = canvas.getBoundingClientRect();
 
-// update mouse pointer coordinates
-document.addEventListener('mousedown', e => {
-  curX = (window.Event) ? e.pageX : e.clientX + (document.documentElement.scrollLeft ? document.documentElement.scrollLeft : document.body.scrollLeft);
-  curY = (window.Event) ? e.pageY : e.clientY + (document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop);
-  let ball = new Ball(curX, curY, colorPicker.value, sizePicker.value);
+function addBall() {
+  let r = Vector2d.rand(10);
+  let ball = new Ball(curX + r.x, curY + r.y, colorPicker.value, sizePicker.value);
   balls.push(ball);
   ball.draw(ctx);
-  ballCount.textContent = balls.length;
+}
+
+canvas.addEventListener('mousedown', e => {
+  // update mouse pointer coordinates
+  curX = (window.Event) ? e.pageX : e.clientX + (document.documentElement.scrollLeft ? document.documentElement.scrollLeft : document.body.scrollLeft);
+  curY = (window.Event) ? e.pageY : e.clientY + (document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop);
+  addBall();
+  if (!flowIntervalId) {
+    flowIntervalId = setInterval(() => {addBall()}, 10);
+  }
 });
 
+canvas.addEventListener('mouseup', e => {
+  if (flowIntervalId) {
+    clearInterval(flowIntervalId);
+  }
+  flowIntervalId = undefined;
+})
+
+canvas.addEventListener('mousemove', e => {
+  curX = (window.Event) ? e.pageX : e.clientX + (document.documentElement.scrollLeft ? document.documentElement.scrollLeft : document.body.scrollLeft);
+  curY = (window.Event) ? e.pageY : e.clientY + (document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop);
+})
+
+// Demonstrate keydown events. No real function at the moment.
 addEventListener('keydown', (event) => {
   if (event.key = 'd') {
     console.log(event.key);
@@ -83,10 +103,13 @@ function animationFrame() {
         let a1 = balls[i].size ** 2;
         let a2 = balls[j].size ** 2;
         let newColor = combineColors(balls[i].color, balls[j].color, a1, a2);
+        let newVelocity = collisionResultVelocity(balls[i], balls[j]);
         let b = (balls[i].size >= balls[j].size) ? i : j;
         let newSize = Math.sqrt((balls[i].size ** 2) + (balls[j].size ** 2))
         balls[b].color = newColor;
         balls[b].size = newSize;
+        balls[b].vX = newVelocity.x;
+        balls[b].vy = newVelocity.y;
         newBalls.push(balls[b]);
         collidedBalls.add(i);
         collidedBalls.add(j);
@@ -132,16 +155,34 @@ function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function getVelocityComponent() {
-  return rand(-5, 5);
-}
-
 function combineColors(c1, c2, a1, a2) {
 
   return new Color(
     Math.round((a1 * c1.red + a2 * c2.red) / (a1 + a2)),
     Math.round((a1 * c1.green + a2 * c2.green) / (a1 + a2)),
     Math.round((a1 * c1.blue + a2 * c2.blue) / (a1 + a2)));
+}
+
+function collisionResultVelocity(b1, b2) {
+  let a1 = b1.size ** 2;
+  let a2 = b2.size ** 2;
+  return new Vector2d(
+    (b1.vX * a1 + b2.vX * a2) / (a1 + a2),
+    (b1.vY * a1 + b2.vY * a2) / (a1 + a2))
+}
+
+class Vector2d {
+
+  constructor(x, y) {
+    this.x = x;
+    this.y = y
+  }
+
+  static rand(m) {
+    let k = m * Math.random();
+    let t = 2 * Math.random() * Math.PI;
+    return new Vector2d(k * Math.cos(t), k * Math.sin(t));
+  }
 }
 
 class Color {
@@ -174,8 +215,9 @@ class Ball {
     this.curY = y;
     this.color = Color.parseHexString(fill);
     this.size = parseFloat(size);
-    this.vX = getVelocityComponent();
-    this.vY = getVelocityComponent();
+    let v = Vector2d.rand(5);
+    this.vX = v.x;
+    this.vY = v.y;
   }
 
   draw() {
@@ -192,14 +234,14 @@ class Ball {
   }
 
   handleWallCollision() {
-    if (this.curX <= 0)
+    if (this.curX - this.size <= 0 && this.vX < 0)
       this.vX = -this.vX;
-    if (this.curY <= shift)
+    if (this.curY - this.size <= shift && this.vY < 0)
       this.vY = -this.vY;
 
-    if (this.curX >= rect.right)
+    if (this.curX + this.size >= rect.right && this.vX > 0)
       this.vX = -this.vX;
-    if (this.curY >= rect.bottom)
+    if (this.curY + this.size >= rect.bottom && this.vY > 0)
       this.vY = -this.vY;
 
   }
