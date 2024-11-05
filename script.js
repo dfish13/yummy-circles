@@ -11,6 +11,8 @@ const radiusPicker = document.querySelector('input[type="range"]');
 const output = document.querySelector('.output');
 const clearBtn = document.getElementById('clearButton');
 const startBtn = document.getElementById('startButton');
+const sprayBtn = document.getElementById('spray');
+const shootBtn = document.getElementById('shoot');
 
 // covert degrees to radians
 function degToRad(degrees) {
@@ -21,14 +23,30 @@ function degToRad(degrees) {
 
 radiusPicker.addEventListener('input', () => output.textContent = radiusPicker.value);
 
+sprayBtn.addEventListener('input', () => {
+  tool = 1;
+});
+shootBtn.addEventListener('input', () => {
+  tool = 0;
+});
+
 // store mouse pointer coordinates, and whether the button is pressed
 let curX;
 let curY;
+
+
 let balls = [];
 let flowIntervalId;
 let interval;
 let shift = 100;
 const rect = canvas.getBoundingClientRect();
+
+// state for the Tool
+// 0 = shoot
+// 1 = spray
+let tool = 1;
+let startPos;
+let endPos;
 
 
 // List of parameters for the simulation
@@ -44,23 +62,42 @@ function addBall() {
   ball.draw(ctx);
 }
 
+function addBallAtPosition(pos, v) {
+  let r = Vector2d.rand(10);
+  let ball = new Ball(pos.x + r.x, pos.y + r.y, colorPicker.value, radiusPicker.value);
+  ball.v = v;
+  balls.push(ball);
+  ball.draw(ctx);
+}
+
 canvas.addEventListener('mousedown', e => {
   // update mouse pointer coordinates
   curX = (window.Event) ? e.pageX : e.clientX + (document.documentElement.scrollLeft ? document.documentElement.scrollLeft : document.body.scrollLeft);
   curY = (window.Event) ? e.pageY : e.clientY + (document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop);
-  addBall();
-  if (!flowIntervalId) {
-    flowIntervalId = setInterval(() => {
-      addBall()
-    }, 20);
+  if (tool == 1) {
+    addBall();
+    if (!flowIntervalId) {
+      flowIntervalId = setInterval(() => {
+        addBall()
+      }, 20);
+    }
+  } else if (tool == 0) {
+    startPos = new Vector2d(curX, curY);
   }
+
 });
 
 canvas.addEventListener('mouseup', e => {
-  if (flowIntervalId) {
-    clearInterval(flowIntervalId);
+  if (tool == 1) {
+    if (flowIntervalId) {
+      clearInterval(flowIntervalId);
+    }
+    flowIntervalId = undefined;
+  } else if (tool == 0) {
+    endPos = new Vector2d(curX, curY);
+    v = Vector2d.difference(startPos, endPos).multiply(0.1);
+    addBallAtPosition(startPos, v);
   }
-  flowIntervalId = undefined;
 })
 
 canvas.addEventListener('mousemove', e => {

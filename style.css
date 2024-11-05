@@ -4,11 +4,15 @@ body {
   background: #ccc;
 }
 
+
+
 .toolbar {
-  width: 150px;
-  height: 90px;
+  width: 120px;
+  height: 80px;
   background: #ccc;
   padding: 5px;
+  display: grid;
+  grid-template-columns: repeat(3, 120px);
 }
 
 input[type="color"], button {
@@ -24,4 +28,17 @@ input[type="range"] {
 span {
  position: relative;
  bottom: 5px;
+}
+
+.box1 {
+  grid-column-start: 1;
+}
+
+.box2 {
+  grid-column-start: 3;
+}
+
+.box3 {
+  grid-column-start: 2;
+  grid-row-start: 1;
 }

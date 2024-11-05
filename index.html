@@ -9,14 +9,30 @@
   </head>
   <body>
     <div class="toolbar">
-      <input type="color" aria-label="select pen color" value="#ff0000">
-      <input type="range" min="2" max="50" value="30" aria-label="select pen size"><span class="output">30</span>
-      <button id="clearButton"> Clear canvas</button>
-      <button id="startButton">Start</button>
+      <div class="box1">
+        <input type="color" aria-label="select pen color" value="#ff0000">
+        <input type="range" min="2" max="50" value="10" aria-label="select pen size"><span class="output">10</span>
+      </div>
+      <div class="box2">
+        <fieldset>
+          <legend>Select tool:</legend>
+          <div>
+            <input type="radio" id="spray" name="tool" value="spray" checked/>
+            <label for="spray">Spray</label>
+          </div>
+          <div>
+            <input type="radio" id="shoot" name="tool" value="shoot" />
+            <label for="shoot">Shoot</label>
+          </div>
+        </fieldset>
+      </div>
+      <div class="box3">
+        <button id="clearButton"> Clear canvas</button>
+        <button id="startButton">Start</button>
+      </div>
     </div>
-
     <canvas class="myCanvas">
-      <p>Add suitable fallback here.</p>
+    <p>Whoops, no canvas sorry.</p>
     </canvas>
   </body>
 </html>
