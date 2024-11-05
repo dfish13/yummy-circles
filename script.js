@@ -7,7 +7,7 @@ ctx.fillStyle = 'rgb(0,0,0)';
 ctx.fillRect(0, 0, width, height);
 
 const colorPicker = document.querySelector('input[type="color"]');
-const sizePicker = document.querySelector('input[type="range"]');
+const radiusPicker = document.querySelector('input[type="range"]');
 const output = document.querySelector('.output');
 const clearBtn = document.getElementById('clearButton');
 const startBtn = document.getElementById('startButton');
@@ -17,9 +17,9 @@ function degToRad(degrees) {
   return degrees * Math.PI / 180;
 };
 
-// update sizepicker output value
+// update radiuspicker output value
 
-sizePicker.addEventListener('input', () => output.textContent = sizePicker.value);
+radiusPicker.addEventListener('input', () => output.textContent = radiusPicker.value);
 
 // store mouse pointer coordinates, and whether the button is pressed
 let curX;
@@ -30,9 +30,16 @@ let interval;
 let shift = 100;
 const rect = canvas.getBoundingClientRect();
 
+
+// List of parameters for the simulation
+
+// In a collision, balls can either bounce off eachother or squish together.
+// This is the probability that the balls squish instead of bouncing.
+const squishProbability = 0.1;
+
 function addBall() {
   let r = Vector2d.rand(10);
-  let ball = new Ball(curX + r.x, curY + r.y, colorPicker.value, sizePicker.value);
+  let ball = new Ball(curX + r.x, curY + r.y, colorPicker.value, radiusPicker.value);
   balls.push(ball);
   ball.draw(ctx);
 }
@@ -43,7 +50,9 @@ canvas.addEventListener('mousedown', e => {
   curY = (window.Event) ? e.pageY : e.clientY + (document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop);
   addBall();
   if (!flowIntervalId) {
-    flowIntervalId = setInterval(() => {addBall()}, 10);
+    flowIntervalId = setInterval(() => {
+      addBall()
+    }, 20);
   }
 });
 
@@ -78,8 +87,8 @@ function clearFrame() {
 
 
 function detectBallCollision(ball1, ball2) {
-  let distance = Math.sqrt((ball1.curX - ball2.curX) ** 2 + (ball1.curY - ball2.curY) ** 2)
-  if (distance <= (ball1.size + ball2.size)) {
+  let distance = ball1.pos.distance(ball2.pos);
+  if (distance <= (ball1.radius + ball2.radius)) {
     return true
   } else {
     return false
@@ -100,20 +109,45 @@ function animationFrame() {
         continue;
       }
       if (detectBallCollision(balls[i], balls[j])) {
-        let a1 = balls[i].size ** 2;
-        let a2 = balls[j].size ** 2;
-        let newColor = combineColors(balls[i].color, balls[j].color, a1, a2);
-        let newVelocity = collisionResultVelocity(balls[i], balls[j]);
-        let b = (balls[i].size >= balls[j].size) ? i : j;
-        let newSize = Math.sqrt((balls[i].size ** 2) + (balls[j].size ** 2))
-        balls[b].color = newColor;
-        balls[b].size = newSize;
-        balls[b].vX = newVelocity.x;
-        balls[b].vy = newVelocity.y;
-        newBalls.push(balls[b]);
+        console.log('collision');
+        let ball1 = balls[i];
+        let ball2 = balls[j];
+        let totalMass = ball1.mass() + ball2.mass();
         collidedBalls.add(i);
         collidedBalls.add(j);
-        break;
+
+        // Balls squish together
+        if (Math.random() < squishProbability) {
+          let newColor = combineColors(balls[i], balls[j]);
+          let b = (balls[i].radius >= balls[j].radius) ? i : j;
+          let newRadius = Math.sqrt(totalMass);
+          balls[b].color = newColor;
+          balls[b].radius = newRadius;
+          balls[b].v = collisionResultVelocity(balls[i], balls[j]);
+          newBalls.push(balls[b]);
+          break;
+        }
+
+        // Balls bounce off eachother in a perfectly elastic collision
+        else {
+          let normal = Vector2d.difference(ball1.pos, ball2.pos);
+          normal.normalize();
+          let tangentNormal = new Vector2d(-normal.y, normal.x);
+          let ball1ScalarNormal = normal.dot(ball1.v);
+          let ball2ScalarNormal = normal.dot(ball2.v);
+          let ball1ScalarTangentNormal = tangentNormal.dot(ball1.v);
+          let ball2ScalarTangentNormal = tangentNormal.dot(ball2.v);
+          let newBall1ScalarNormal = (ball1ScalarNormal * (ball1.mass() - ball2.mass()) + 2 * ball2.mass() * ball2ScalarNormal) / totalMass;
+          let newBall2ScalarNormal = (ball2ScalarNormal * (ball2.mass() - ball1.mass()) + 2 * ball1.mass() * ball1ScalarNormal) / totalMass;
+          let newBall1Velocity = tangentNormal.multiply(ball1ScalarTangentNormal).add(normal.multiply(newBall1ScalarNormal));
+          let newBall2Velocity = tangentNormal.multiply(ball2ScalarTangentNormal).add(normal.multiply(newBall2ScalarNormal));
+
+          ball1.v = newBall1Velocity;
+          ball2.v = newBall2Velocity;
+          newBalls.push(ball1);
+          newBalls.push(ball2);
+        }
+
       }
     }
   }
@@ -147,7 +181,7 @@ startBtn.addEventListener('click', () => {
 function drawBall() {
   ctx.fillStyle = colorPicker.value;
   ctx.beginPath();
-  ctx.arc(curX, curY - shift, sizePicker.value, degToRad(0), degToRad(360), false);
+  ctx.arc(curX, curY - shift, radiusPicker.value, degToRad(0), degToRad(360), false);
   ctx.fill();
 }
 
@@ -155,20 +189,21 @@ function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function combineColors(c1, c2, a1, a2) {
-
+function combineColors(b1, b2) {
+  let a1 = b1.mass();
+  let a2 = b2.mass();
   return new Color(
-    Math.round((a1 * c1.red + a2 * c2.red) / (a1 + a2)),
-    Math.round((a1 * c1.green + a2 * c2.green) / (a1 + a2)),
-    Math.round((a1 * c1.blue + a2 * c2.blue) / (a1 + a2)));
+    Math.round((a1 * b1.color.red + a2 * b2.color.red) / (a1 + a2)),
+    Math.round((a1 * b1.color.green + a2 * b2.color.green) / (a1 + a2)),
+    Math.round((a1 * b1.color.blue + a2 * b2.color.blue) / (a1 + a2)));
 }
 
 function collisionResultVelocity(b1, b2) {
-  let a1 = b1.size ** 2;
-  let a2 = b2.size ** 2;
+  let a1 = b1.radius ** 2;
+  let a2 = b2.radius ** 2;
   return new Vector2d(
-    (b1.vX * a1 + b2.vX * a2) / (a1 + a2),
-    (b1.vY * a1 + b2.vY * a2) / (a1 + a2))
+    (b1.v.x * a1 + b2.v.x * a2) / (a1 + a2),
+    (b1.v.y * a1 + b2.v.y * a2) / (a1 + a2))
 }
 
 class Vector2d {
@@ -182,6 +217,37 @@ class Vector2d {
     let k = m * Math.random();
     let t = 2 * Math.random() * Math.PI;
     return new Vector2d(k * Math.cos(t), k * Math.sin(t));
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y;
+  }
+
+  normalize() {
+    let m = Math.sqrt(this.x ** 2 + this.y ** 2);
+    this.x = this.x / m;
+    this.y = this.y / m;
+  }
+
+  add(v) {
+    return new Vector2d(this.x + v.x, this.y + v.y);
+  }
+
+  distance(v) {
+    return Math.sqrt((this.x - v.x) ** 2 + (this.y - v.y) ** 2)
+  }
+
+  subtract(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+  }
+
+  multiply(a) {
+    return new Vector2d(this.x * a, this.y * a);
+  }
+
+  static difference(a, b) {
+    return new Vector2d(a.x - b.x, a.y - b.y);
   }
 }
 
@@ -210,39 +276,39 @@ class Color {
 
 class Ball {
 
-  constructor(x, y, fill, size) {
-    this.curX = x;
-    this.curY = y;
+  constructor(x, y, fill, radius) {
+    this.pos = new Vector2d(x, y);
     this.color = Color.parseHexString(fill);
-    this.size = parseFloat(size);
-    let v = Vector2d.rand(5);
-    this.vX = v.x;
-    this.vY = v.y;
+    this.radius = parseFloat(radius);
+    this.v = Vector2d.rand(5);
   }
 
   draw() {
     ctx.fillStyle = this.color.toHexString();
     ctx.beginPath();
-    ctx.arc(this.curX, this.curY - shift, this.size, degToRad(0), degToRad(360), false);
+    ctx.arc(this.pos.x, this.pos.y - shift, this.radius, degToRad(0), degToRad(360), false);
     ctx.fill();
   }
 
   step() {
     this.handleWallCollision();
-    this.curX += this.vX;
-    this.curY += this.vY;
+    this.pos = this.pos.add(this.v);
+  }
+
+  mass() {
+    return this.radius ** 2;
   }
 
   handleWallCollision() {
-    if (this.curX - this.size <= 0 && this.vX < 0)
-      this.vX = -this.vX;
-    if (this.curY - this.size <= shift && this.vY < 0)
-      this.vY = -this.vY;
+    if (this.pos.x - this.radius <= 0 && this.pos.x < 0)
+      this.v.x = -this.v.x;
+    if (this.pos.y - this.radius <= shift && this.pos.y < 0)
+      this.v.y = -this.v.y;
 
-    if (this.curX + this.size >= rect.right && this.vX > 0)
-      this.vX = -this.vX;
-    if (this.curY + this.size >= rect.bottom && this.vY > 0)
-      this.vY = -this.vY;
+    if (this.pos.x + this.radius >= rect.right && this.pos.x > 0)
+      this.v.x = -this.v.x;
+    if (this.pos.y + this.radius >= rect.bottom && this.pos.y > 0)
+      this.v.y = -this.v.y;
 
   }
 
