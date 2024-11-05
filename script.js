@@ -109,7 +109,6 @@ function animationFrame() {
         continue;
       }
       if (detectBallCollision(balls[i], balls[j])) {
-        console.log('collision');
         let ball1 = balls[i];
         let ball2 = balls[j];
         let totalMass = ball1.mass() + ball2.mass();
@@ -132,15 +131,15 @@ function animationFrame() {
         else {
           let normal = Vector2d.difference(ball1.pos, ball2.pos);
           normal.normalize();
-          let tangentNormal = new Vector2d(-normal.y, normal.x);
+          let tangential = new Vector2d(-normal.y, normal.x);
           let ball1ScalarNormal = normal.dot(ball1.v);
           let ball2ScalarNormal = normal.dot(ball2.v);
-          let ball1ScalarTangentNormal = tangentNormal.dot(ball1.v);
-          let ball2ScalarTangentNormal = tangentNormal.dot(ball2.v);
+          let ball1ScalarTangential = tangential.dot(ball1.v);
+          let ball2ScalarTangential = tangential.dot(ball2.v);
           let newBall1ScalarNormal = (ball1ScalarNormal * (ball1.mass() - ball2.mass()) + 2 * ball2.mass() * ball2ScalarNormal) / totalMass;
           let newBall2ScalarNormal = (ball2ScalarNormal * (ball2.mass() - ball1.mass()) + 2 * ball1.mass() * ball1ScalarNormal) / totalMass;
-          let newBall1Velocity = tangentNormal.multiply(ball1ScalarTangentNormal).add(normal.multiply(newBall1ScalarNormal));
-          let newBall2Velocity = tangentNormal.multiply(ball2ScalarTangentNormal).add(normal.multiply(newBall2ScalarNormal));
+          let newBall1Velocity = tangential.multiply(ball1ScalarTangential).add(normal.multiply(newBall1ScalarNormal));
+          let newBall2Velocity = tangential.multiply(ball2ScalarTangential).add(normal.multiply(newBall2ScalarNormal));
 
           ball1.v = newBall1Velocity;
           ball2.v = newBall2Velocity;
@@ -300,17 +299,18 @@ class Ball {
   }
 
   handleWallCollision() {
-    if (this.pos.x - this.radius <= 0 && this.pos.x < 0)
+    // left wall
+    if (this.pos.x - this.radius <= 0 && this.v.x < 0)
       this.v.x = -this.v.x;
-    if (this.pos.y - this.radius <= shift && this.pos.y < 0)
+    // ceiling
+    if (this.pos.y - this.radius <= shift && this.v.y < 0)
       this.v.y = -this.v.y;
-
-    if (this.pos.x + this.radius >= rect.right && this.pos.x > 0)
+    // right wall
+    if (this.pos.x + this.radius >= rect.right && this.v.x > 0)
       this.v.x = -this.v.x;
-    if (this.pos.y + this.radius >= rect.bottom && this.pos.y > 0)
+    // floor
+    if (this.pos.y + this.radius >= rect.bottom && this.v.y > 0)
       this.v.y = -this.v.y;
-
   }
-
 
 }
